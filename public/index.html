@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>JuryRigged</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                --bg: #0a0a0f;
+                --panel: #14141d;
+                --text: #ececf3;
+                --muted: #9da2b6;
+                --accent: #88b4ff;
+                --danger: #ff7b8b;
+                --ok: #6dd3a7;
+            }
+
+            body {
+                margin: 0;
+                background: radial-gradient(circle at top, #1a1a2b, var(--bg));
+                color: var(--text);
+                font-family:
+                    Inter,
+                    ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    Segoe UI,
+                    Roboto,
+                    Helvetica,
+                    Arial,
+                    sans-serif;
+            }
+
+            .layout {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 24px;
+                display: grid;
+                grid-template-columns: 2fr 1fr;
+                gap: 16px;
+            }
+
+            .panel {
+                background: color-mix(in srgb, var(--panel) 88%, transparent);
+                border: 1px solid #2b2f41;
+                border-radius: 14px;
+                box-shadow: 0 10px 40px #00000070;
+                padding: 16px;
+            }
+
+            h1,
+            h2,
+            h3 {
+                margin: 0 0 10px;
+            }
+
+            h1 {
+                font-size: 22px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .muted {
+                color: var(--muted);
+                font-size: 13px;
+            }
+
+            .form-row {
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+            }
+
+            input,
+            select,
+            button {
+                border-radius: 10px;
+                border: 1px solid #363b53;
+                background: #171a28;
+                color: var(--text);
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+
+            input,
+            select {
+                width: 100%;
+            }
+
+            button {
+                cursor: pointer;
+                transition: 160ms ease;
+            }
+
+            button:hover {
+                transform: translateY(-1px);
+                border-color: var(--accent);
+            }
+
+            .badge {
+                display: inline-flex;
+                padding: 4px 8px;
+                border-radius: 999px;
+                border: 1px solid #3a3f5c;
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            .phase {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+
+            .overlay-shell {
+                margin-bottom: 12px;
+                border: 1px solid #2b2f41;
+                border-radius: 12px;
+                padding: 10px;
+                background: #121624;
+                display: grid;
+                gap: 8px;
+            }
+
+            .pixi-stage {
+                min-height: 380px;
+                border: 1px solid #2b2f41;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #0d1423, #171f33);
+                overflow: hidden;
+                position: relative;
+            }
+
+            .pixi-stage[data-pixi-ready='false']::before {
+                content: 'Renderer stage bootstrapping…';
+                color: var(--muted);
+                font-size: 12px;
+                position: absolute;
+                left: 10px;
+                top: 8px;
+            }
+
+            .pixi-stage canvas {
+                width: 100% !important;
+                height: 380px !important;
+                display: block;
+            }
+
+            .banner {
+                border: 1px solid #4f2f35;
+                background: color-mix(in srgb, var(--danger) 12%, #1a1216);
+                color: #ffd8de;
+                border-radius: 10px;
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+
+            .hidden {
+                display: none;
+            }
+
+            .overlay-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 8px;
+                font-size: 13px;
+                color: var(--muted);
+            }
+
+            .caption-controls {
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .caption-controls-actions {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+            }
+
+            .caption-controls-actions .badge {
+                background: #171a28;
+            }
+
+            .caption-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            .caption-toggle input {
+                width: auto;
+                margin: 0;
+                accent-color: var(--accent);
+            }
+
+            #captionLine {
+                font-size: 14px;
+                color: var(--text);
+                border-left: 3px solid #3b4160;
+                padding-left: 8px;
+            }
+
+            .timer-track {
+                width: 100%;
+                height: 7px;
+                border-radius: 999px;
+                background: #2b2f41;
+                overflow: hidden;
+            }
+
+            .timer-fill {
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, #6f8dff, #88b4ff);
+                transition: width 180ms linear;
+            }
+
+            .speaker-live {
+                color: #d9e6ff;
+                text-shadow: 0 0 12px #88b4ff66;
+            }
+
+            .catchup-shell {
+                margin-bottom: 12px;
+                border: 1px solid #2b2f41;
+                border-radius: 12px;
+                padding: 10px;
+                background: #121624;
+                display: grid;
+                gap: 8px;
+            }
+
+            .catchup-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .catchup-summary {
+                font-size: 13px;
+                color: var(--text);
+                line-height: 1.4;
+            }
+
+            .catchup-meta {
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            .loading {
+                opacity: 0.65;
+                cursor: wait;
+            }
+
+            #feed {
+                max-height: 60vh;
+                overflow: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding-right: 4px;
+            }
+
+            .turn {
+                border-left: 3px solid var(--accent);
+                border-radius: 10px;
+                background: #121624;
+                padding: 10px;
+            }
+
+            .turn .meta {
+                color: var(--muted);
+                font-size: 12px;
+                margin-bottom: 6px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+            }
+
+            .turn .meta .turn-number {
+                color: var(--muted);
+            }
+
+            .turn .meta .role-badge {
+                background: #2b2f41;
+                color: #d9e6ff;
+                border-radius: 999px;
+                padding: 2px 8px;
+                font-size: 11px;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+            }
+
+            .turn .meta .speaker {
+                color: var(--text);
+                font-weight: 600;
+            }
+
+            .turn .meta .phase-label {
+                font-size: 11px;
+                color: var(--muted);
+            }
+
+            .turn .body {
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 3;
+                overflow: hidden;
+            }
+
+            .turn.recap {
+                border-left-color: #f7d794;
+                background: #1b1a12;
+            }
+
+            .turn.recap .meta {
+                color: #d0c199;
+            }
+
+            .vote-grid {
+                display: grid;
+                gap: 8px;
+                margin-top: 12px;
+            }
+
+            .vote-row {
+                display: grid;
+                gap: 4px;
+                font-size: 13px;
+                color: var(--muted);
+            }
+
+            .vote-bar {
+                width: 100%;
+                height: 8px;
+                border-radius: 999px;
+                background: #2b2f41;
+                overflow: hidden;
+            }
+
+            .vote-bar-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #698eff, #88b4ff);
+            }
+
+            .vote-actions {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-top: 8px;
+            }
+
+            .vote-meta {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 6px;
+            }
+
+            .vote-error {
+                color: var(--danger);
+                font-size: 12px;
+                min-height: 14px;
+            }
+
+            .vote-note {
+                color: var(--ok);
+                font-size: 12px;
+                min-height: 14px;
+            }
+
+            .ok {
+                color: var(--ok);
+            }
+
+            .danger {
+                color: var(--danger);
+            }
+
+            @media (max-width: 900px) {
+                .layout {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="layout">
+            <section class="panel">
+                <h1>⚖️ JuryRigged</h1>
+                <p class="muted">
+                    Text-first courtroom flow with multi-agent roles, live
+                    transcript, and jury voting.
+                </p>
+
+                <div class="form-row">
+                    <input
+                        id="topic"
+                        placeholder="Case prompt (e.g., Did the defendant weaponize office glitter?)"
+                    />
+                </div>
+                <div class="form-row">
+                    <select id="caseType">
+                        <option value="criminal">
+                            Criminal (Guilty / Not Guilty)
+                        </option>
+                        <option value="civil">
+                            Civil (Liable / Not Liable)
+                        </option>
+                    </select>
+                    <button id="startBtn">Start Session</button>
+                </div>
+
+                <hr
+                    style="border-color: #2b2f41; opacity: 0.6; margin: 16px 0"
+                />
+
+                <div id="connectionBanner" class="banner hidden"></div>
+
+                <div class="phase">
+                    <div>
+                        <h3 style="margin: 0">Live Transcript</h3>
+                        <div class="muted" id="sessionMeta">
+                            No session yet.
+                        </div>
+                    </div>
+                    <span class="badge" id="phaseBadge">phase: idle</span>
+                </div>
+                <div class="overlay-shell">
+                    <div
+                        id="pixiStage"
+                        class="pixi-stage"
+                        data-pixi-ready="false"
+                        aria-live="off"
+                    ></div>
+                    <div class="overlay-row">
+                        <span>⏱️ Phase timer</span>
+                        <span id="phaseTimer">--:--</span>
+                    </div>
+                    <div class="timer-track">
+                        <div id="phaseTimerFill" class="timer-fill"></div>
+                    </div>
+                    <div class="overlay-row">
+                        <span>🎙️ Active speaker</span>
+                        <span id="activeSpeaker">Waiting for first turn…</span>
+                    </div>
+                    <div class="overlay-row caption-controls">
+                        <span>⌨️ Dialogue animation</span>
+                        <div class="caption-controls-actions">
+                            <button
+                                id="captionSkipBtn"
+                                type="button"
+                                class="badge"
+                            >
+                                Skip line
+                            </button>
+                            <button
+                                id="captionTypewriterToggle"
+                                type="button"
+                                class="badge"
+                            >
+                                Typewriter: on
+                            </button>
+                            <label class="caption-toggle" for="captionSkipAll">
+                                <input id="captionSkipAll" type="checkbox" />
+                                Always skip
+                            </label>
+                        </div>
+                    </div>
+                    <div id="captionLine">Captions will appear here.</div>
+                </div>
+
+                <div class="catchup-shell">
+                    <div class="catchup-header">
+                        <h3 style="margin: 0; font-size: 14px">
+                            🧭 Case so far
+                        </h3>
+                        <button
+                            id="catchupToggle"
+                            type="button"
+                            class="badge"
+                            aria-expanded="true"
+                            aria-controls="catchupBody"
+                        >
+                            Hide
+                        </button>
+                    </div>
+                    <div id="catchupBody">
+                        <div id="catchupSummary" class="catchup-summary">
+                            Waiting for opening statements…
+                        </div>
+                        <div id="catchupMeta" class="catchup-meta">
+                            phase: idle · Jury pending
+                        </div>
+                    </div>
+                </div>
+
+                <div id="feed"></div>
+            </section>
+
+            <aside class="panel">
+                <h2 style="font-size: 18px">Jury Controls</h2>
+                <p class="muted">
+                    Vote while polls are open. Tallies update live.
+                </p>
+
+                <div style="margin-top: 12px">
+                    <h3 style="font-size: 14px; margin-bottom: 6px">
+                        Verdict vote
+                    </h3>
+                    <div class="vote-meta">
+                        <span id="verdictStatus" class="badge">Closed</span>
+                        <span id="verdictCountdown" class="muted">--:--</span>
+                    </div>
+                    <div id="verdictTallies" class="vote-grid"></div>
+                    <div id="verdictError" class="vote-error"></div>
+                    <div id="verdictNote" class="vote-note"></div>
+                    <div class="vote-actions" id="verdictActions"></div>
+                </div>
+
+                <div style="margin-top: 16px">
+                    <h3 style="font-size: 14px; margin-bottom: 6px">
+                        Sentence vote
+                    </h3>
+                    <div class="vote-meta">
+                        <span id="sentenceStatus" class="badge">Closed</span>
+                        <span id="sentenceCountdown" class="muted">--:--</span>
+                    </div>
+                    <div id="sentenceTallies" class="vote-grid"></div>
+                    <div id="sentenceError" class="vote-error"></div>
+                    <div id="sentenceNote" class="vote-note"></div>
+                    <div class="vote-actions" id="sentenceActions"></div>
+                </div>
+
+                <div style="margin-top: 16px" class="muted" id="status"></div>
+            </aside>
+        </div>
+
+        <script src="/howler.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.9.1/dist/pixi.min.js"></script>
+        <script type="module" src="/app.js"></script>
+    </body>
+</html>
