@@ -1,4 +1,4 @@
-name: Staging Deploy
+name: Disposable staging qualification
 
 on:
   workflow_dispatch:
@@ -7,14 +7,6 @@ on:
         description: Git ref (branch, tag, or SHA) to deploy
         required: false
         default: main
-      api_host_port:
-        description: Host port for API container mapping
-        required: false
-        default: '3001'
-      openrouter_api_key:
-        description: OpenRouter key for live profile runs (leave empty for mock profile)
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -26,6 +18,7 @@ concurrency:
 jobs:
   deploy-staging:
     name: Deploy staging (${{ matrix.profile }})
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -36,10 +29,10 @@ jobs:
           - profile: live
             llm_mock: 'false'
     env:
-      API_HOST_PORT: ${{ github.event.inputs.api_host_port }}
+      COMPOSE_PROJECT_NAME: jury-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.profile }}
+      COMPOSE_FILE: .ci-compose.json
       DEPLOY_PROFILE: ${{ matrix.profile }}
       LLM_MOCK: ${{ matrix.llm_mock }}
-      OPENROUTER_API_KEY_INPUT: ${{ github.event.inputs.openrouter_api_key }}
 
     steps:
       - name: Checkout repository
@@ -53,9 +46,11 @@ jobs:
           echo "deploy_started_at=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
 
       - name: Validate staging credential contract
+        env:
+          OPENROUTER_API_KEY: ${{ matrix.profile == 'live' && secrets.OPENROUTER_API_KEY || '' }}
         run: |
-          if [[ "${DEPLOY_PROFILE}" == "live" && -z "${OPENROUTER_API_KEY_INPUT}" ]]; then
-            echo "openrouter_api_key input is required for live staging profile."
+          if [[ "${DEPLOY_PROFILE}" == "live" && -z "${OPENROUTER_API_KEY}" ]]; then
+            echo "OPENROUTER_API_KEY repository secret is required for the live staging profile."
             exit 1
           fi
 
@@ -69,15 +64,17 @@ jobs:
         run: npm ci
 
       - name: Prepare staging environment file
+        env:
+          OPENROUTER_API_KEY: ${{ matrix.profile == 'live' && secrets.OPENROUTER_API_KEY || '' }}
         run: |
           openrouter_key=""
           if [[ "${DEPLOY_PROFILE}" == "live" ]]; then
-            openrouter_key="${OPENROUTER_API_KEY_INPUT}"
+            openrouter_key="${OPENROUTER_API_KEY}"
           fi
 
+          umask 077
           cp .env.example .env
           {
-            echo "API_HOST_PORT=${API_HOST_PORT}"
             echo "LLM_MOCK=${LLM_MOCK}"
             echo "OPENROUTER_API_KEY=${openrouter_key}"
             echo "LOG_LEVEL=info"
@@ -85,14 +82,35 @@ jobs:
             echo "BROADCAST_PROVIDER=noop"
           } >> .env
 
-      - name: Deploy compose stack
-        run: docker compose --env-file .env up -d --build
+      - name: Start an isolated disposable staging stack
+        run: |
+          set -euo pipefail
+          umask 077
+          docker compose -f docker-compose.yml --env-file .env config --format json | python3 scripts/staging-compose.py > .ci-compose.json
+          docker compose up -d --build --wait --wait-timeout 120
+
+      - name: Resolve this profile's API endpoint
+        run: |
+          set -euo pipefail
+          api=$(docker compose ps -q api)
+          test -n "$api"
+          if docker inspect --type container "$HOSTNAME" >/dev/null 2>&1; then
+            docker network connect "${COMPOSE_PROJECT_NAME}_internal" "$HOSTNAME"
+            host=$(docker inspect -f '{{with index .NetworkSettings.Networks "'"${COMPOSE_PROJECT_NAME}_internal"'"}}{{.IPAddress}}{{end}}' "$api")
+            port=3001
+          else
+            host=127.0.0.1
+            binding=$(docker compose port api 3001)
+            port=${binding##*:}
+          fi
+          printf 'API_BASE_URL=http://%s:%s\n' "$host" "$port" >> "$GITHUB_ENV"
+
 
       - name: Wait for API health
         run: |
           rm -f smoke-health.json
           for _attempt in {1..30}; do
-            if curl -fsS "http://localhost:${API_HOST_PORT}/api/health" > smoke-health.json; then
+            if curl -fsS "${API_BASE_URL}/api/health" > smoke-health.json; then
               cat smoke-health.json
               exit 0
             fi
@@ -104,7 +122,7 @@ jobs:
       - name: Run staging smoke checks
         run: |
           chmod +x scripts/staging-smoke.sh
-          API_BASE_URL="http://localhost:${API_HOST_PORT}" \
+          API_BASE_URL="$API_BASE_URL" \
           SMOKE_OUTPUT_PATH="smoke-results.json" \
           scripts/staging-smoke.sh
 
@@ -159,15 +177,26 @@ jobs:
 
       - name: Capture compose logs
         if: ${{ always() }}
-        run: docker compose logs --no-color > docker-compose.log || true
+        run: |
+          if [ -s .ci-compose.json ]; then docker compose logs --no-color > docker-compose.log; fi
 
       - name: Tear down compose stack
         if: ${{ always() }}
-        run: docker compose down -v || true
+        run: |
+          if [ -s .ci-compose.json ]; then
+            if docker inspect --type container "$HOSTNAME" >/dev/null 2>&1; then
+              docker network disconnect "${COMPOSE_PROJECT_NAME}_internal" "$HOSTNAME" || true
+            fi
+            docker compose down -v
+          fi
+
+      - name: Remove staging credential file
+        if: ${{ always() }}
+        run: rm -f .env .ci-compose.json
 
       - name: Upload deployment artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: https://gitea.com/actions/upload-artifact@c24449f33cd45d4826c6702db7e49f7cdb9b551d
         with:
           name: staging-${{ matrix.profile }}-${{ github.run_id }}
           path: |
