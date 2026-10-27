@@ -1,6 +1,6 @@
 # JuryRigged
 
-[![CI](https://github.com/subculture-collective/court/actions/workflows/ci.yml/badge.svg)](https://github.com/subculture-collective/court/actions/workflows/ci.yml)
+[CI on Gitea](https://git.subcult.tv/subculture-collective/jury-rigged/actions)
 
 JuryRigged is a real-time, multi-agent courtroom simulation.
 An Express API orchestrates agent dialogue across deterministic phases, streams live events via Server-Sent Events (SSE), and supports jury voting for verdict and sentence outcomes.
